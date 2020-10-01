@@ -4,6 +4,9 @@ float sq(float x) {
     return x * x;
 }
 
+float sq_64(float x) {
+    return sq(sq(sq(sq(sq(sq(x))))));
+}
 
 float lenSq(vec2 x) {
     return dot(x, x);
@@ -77,20 +80,17 @@ void initLight(out pointLight light, in vec4 center, in vec4 color, in float int
 }
     
 void lightCalc(out float lightingIntensity, out float specularIntensity, in sSphere sphere, in pointLight light, in vec3 normal, in vec3 position, in vec3 viewport) {
-    
     vec3 direction = vec3(position.x - light.center.x, position.y - light.center.y, position.z - light.center.z);
+
+    vec3 halfwayVector = normalize(direction - viewport);
     
-    vec3 reflectedLightVector = reflect(-direction, normal);
+    float specularCoefficient = dot(normal, halfwayVector);
     
-    vec3 viewVector =  (viewport - position) / normalize(viewport - position);
-    
-    float specularCoefficient = max(0.0, dot(viewVector, reflectedLightVector));
-    
-    specularIntensity = sq(sq(sq(sq(specularCoefficient))));
+    specularIntensity = sq(sq_64(specularCoefficient));
     
     float dist = sqrt(sq(direction.x) + sq(direction.y) + sq(direction.z));
     
-    vec3 lightNormal = direction / normalize(direction);
+    vec3 lightNormal = normalize(light.center.xyz - position);
     
     float diffuseCoefficient = max(0.0, dot(normal, lightNormal));
     
@@ -127,10 +127,13 @@ vec4 calcColor(in vec4 rayDirection, in vec4 rayOrigin, in vec3 viewport)
 	
     //SCENE
     sSphere sphere;
-    initSphere(sphere, vec3(0.0, 0.0, -4.0), 0.5);
+    initSphere(sphere, vec3(0.0, 0.0, -5.0), 0.5);
     
     pointLight light;
-    initLight(light, vec4(0.0), vec4(1.0), 2.0); 
+    initLight(light, vec4(5.0, 5.0, 2.5, 0.0), vec4(1.0), 20.0);
+    
+    pointLight light2;
+    initLight(light2, vec4(-1.0, -5.0, 2.5, 0.0), vec4(1.0), 10.0);
     
     vec3 dp;
     dp.xy = rayDirection.xy - sphere.center.xy;
@@ -148,18 +151,24 @@ vec4 calcColor(in vec4 rayDirection, in vec4 rayOrigin, in vec3 viewport)
         
         vec4 color = vec4(normal * 0.5 + 0.5, 1.0);
         
-        float lightIntensity, specularIntensity;
+        float lightIntensity, specularIntensity, lightIntensity2, specularIntensity2;
         //return color;
         
         lightCalc(lightIntensity, specularIntensity, sphere, light, normal, position, viewport);
+        lightCalc(lightIntensity2, specularIntensity2, sphere, light2, normal, position, viewport);
         
-        return (lightIntensity * light.color + specularIntensity * (light.color * 2.0)) * color;
+        vec4 returnColor = vec4(0.0);
+        
+        returnColor += (lightIntensity * light.color + specularIntensity * light.color);
+        returnColor += (lightIntensity2 * light2.color + specularIntensity2 * light2.color);
+        
+        return returnColor * color;
     }
     
 	// BACKGROUND
 	const vec3 warm = vec3(0.8, 0.4, 0.2), cool = vec3(0.2, 0.4, 0.8);
-	//return vec4(mix(warm, cool, rayDirection.y), 1.0);
-    return vec4(0.5);
+	return vec4(mix(warm, cool, rayDirection.y), 1.0);
+    //return vec4(0.5);
 }
 
 // mainImage: process the current pixel (exactly one call per pixel)
